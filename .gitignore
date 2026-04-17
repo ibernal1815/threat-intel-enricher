@@ -1,0 +1,39 @@
+# environment variables — never commit keys
+.env
+.env.*
+
+# python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+
+# virtual environments
+venv/
+.venv/
+env/
+.env/
+
+# test output / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+
+# distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# editor / OS noise
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# tool output — reports generated at runtime, not source files
+*.json
+!tests/fixtures/*.json
