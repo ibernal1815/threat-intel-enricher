@@ -1,79 +1,79 @@
 # threat-intel-enricher
 
-takes IOCs (IPs, domains, file hashes) and enriches them against VirusTotal and AbuseIPDB. outputs a structured JSON report with detection counts, abuse confidence scores, tags, and a verdict per IOC.
+Takes IOCs (IPs, domains, file hashes) and enriches them against VirusTotal and AbuseIPDB. Outputs a structured JSON report with detection counts, abuse confidence scores, tags, and a verdict per IOC.
 
-built to work as a pipeline with [log-normalizer](https://github.com/ibernal1815/log-normalizer), but works fine standalone too.
+Built to work as a pipeline with [log-normalizer](https://github.com/ibernal1815/log-normalizer), but works fine standalone too.
 
----
+## Background
 
-## setup
+Extracting IOCs from logs is only half the work. The other half is knowing whether those IOCs are actually malicious. I built this to close that gap — once log-normalizer pulls IPs, domains, and hashes out of a log file, this tool runs them through VirusTotal and AbuseIPDB and comes back with a verdict.
+
+The rate limiter handles the VT free tier cap automatically so you can enrich a full IOC set without babysitting the requests.
+
+## Setup
 
 ```bash
 git clone https://github.com/ibernal1815/threat-intel-enricher
 cd threat-intel-enricher
-pip install requests
+pip install -r requirements.txt
 ```
 
-set your API keys as environment variables before running. free keys at [virustotal.com](https://www.virustotal.com) and [abuseipdb.com](https://www.abuseipdb.com).
+Set your API keys as environment variables before running. Free keys at [virustotal.com](https://www.virustotal.com) and [abuseipdb.com](https://www.abuseipdb.com).
 
 ```bash
 export VT_API_KEY="your_virustotal_key"
 export ABUSEIPDB_API_KEY="your_abuseipdb_key"
 ```
 
-VT free tier is 4 requests/minute and 500/day. the rate limiter handles the per-minute cap automatically.
+VT free tier is 4 requests/minute and 500/day. The rate limiter handles the per-minute cap automatically.
 
----
+## Usage
 
-## usage
-
-pipe from log-normalizer:
+Pipe from log-normalizer:
 
 ```bash
 python main.py --input auth.log --iocs-only | python enricher.py
 ```
 
-load from a JSON file:
+Load from a JSON file:
 
 ```bash
 python enricher.py --iocs iocs.json
 ```
 
-pass IOCs directly:
+Pass IOCs directly:
 
 ```bash
 python enricher.py --ip 185.220.101.5 --domain malicious.example.com --hash abc123...
 ```
 
-enrich inline with full log-normalizer output:
+Enrich inline with full log-normalizer output:
 
 ```bash
 python main.py --input auth.log | python enricher.py --enrich
 ```
 
-write to a file instead of stdout:
+Write to a file instead of stdout:
 
 ```bash
 python enricher.py --iocs iocs.json --output report.json
 ```
 
-include raw API responses (useful for debugging or deeper triage):
+Include raw API responses (useful for debugging or deeper triage):
 
 ```bash
 python enricher.py --ip 185.220.101.5 --include-raw
 ```
 
-compact output for piping into jq or other tools:
+Compact output for piping into jq or other tools:
 
 ```bash
 python enricher.py --iocs iocs.json --compact | jq '.iocs[] | select(.verdict == "malicious")'
 ```
 
----
+## Output
 
-## output
-
-each IOC gets a record like this:
+Each IOC gets a record like this:
 
 ```json
 {
@@ -105,22 +105,22 @@ each IOC gets a record like this:
 }
 ```
 
-the full report wraps all IOCs in a summary envelope with counts by verdict and type.
+The full report wraps all IOCs in a summary envelope with counts by verdict and type.
 
-verdicts are `clean`, `suspicious`, or `malicious`. the thresholds are in `config.py` and tunable. defaults are 10 VT engines for malicious and 75 AbuseIPDB confidence score. Tor exit nodes get flagged suspicious regardless of score.
+Verdicts are `clean`, `suspicious`, or `malicious`. The thresholds are in `config.py` and tunable. Defaults are 10 VT engines for malicious and 75 AbuseIPDB confidence score. Tor exit nodes get flagged suspicious regardless of score.
 
----
+## Tests
 
-## tests
-
-all API calls are mocked so you don't need real keys to run the suite:
+All API calls are mocked so you do not need real keys to run the suite:
 
 ```bash
 python -m pytest test_enricher.py -v
 ```
 
----
+## Related Projects
 
-## related projects
+[log-normalizer](https://github.com/ibernal1815/log-normalizer) parses and normalizes raw security logs into structured JSON. The `--iocs-only` flag pipes directly into this tool.
 
-[log-normalizer](https://github.com/ibernal1815/log-normalizer) — parses and normalizes raw security logs into structured JSON. the `--iocs-only` flag pipes directly into this tool.
+## Stack
+
+Python 3 · requests · rich · pytest
