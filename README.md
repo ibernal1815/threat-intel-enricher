@@ -2,12 +2,14 @@
 
 takes IOCs (IPs, domains, file hashes) and enriches them against VirusTotal and AbuseIPDB. outputs a structured JSON report with detection counts, abuse confidence scores, tags, and a verdict per IOC.
 
-built to work as a pipeline with [log-normalizer](https://github.com/yourusername/log-normalizer), but works fine standalone too.
+built to work as a pipeline with [log-normalizer](https://github.com/ibernal1815/log-normalizer), but works fine standalone too.
+
+---
 
 ## setup
 
 ```bash
-git clone https://github.com/yourusername/threat-intel-enricher
+git clone https://github.com/ibernal1815/threat-intel-enricher
 cd threat-intel-enricher
 pip install requests
 ```
@@ -20,6 +22,8 @@ export ABUSEIPDB_API_KEY="your_abuseipdb_key"
 ```
 
 VT free tier is 4 requests/minute and 500/day. the rate limiter handles the per-minute cap automatically.
+
+---
 
 ## usage
 
@@ -65,6 +69,8 @@ compact output for piping into jq or other tools:
 python enricher.py --iocs iocs.json --compact | jq '.iocs[] | select(.verdict == "malicious")'
 ```
 
+---
+
 ## output
 
 each IOC gets a record like this:
@@ -103,14 +109,18 @@ the full report wraps all IOCs in a summary envelope with counts by verdict and 
 
 verdicts are `clean`, `suspicious`, or `malicious`. the thresholds are in `config.py` and tunable. defaults are 10 VT engines for malicious and 75 AbuseIPDB confidence score. Tor exit nodes get flagged suspicious regardless of score.
 
+---
+
 ## tests
 
 all API calls are mocked so you don't need real keys to run the suite:
 
 ```bash
-python -m pytest tests/ -v
+python -m pytest test_enricher.py -v
 ```
+
+---
 
 ## related projects
 
-[log-normalizer](https://github.com/yourusername/log-normalizer) extracts and normalizes IOCs from raw security logs. the `--iocs-only` flag pipes directly into this tool.
+[log-normalizer](https://github.com/ibernal1815/log-normalizer) — parses and normalizes raw security logs into structured JSON. the `--iocs-only` flag pipes directly into this tool.
