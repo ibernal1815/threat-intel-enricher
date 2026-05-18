@@ -1,7 +1,20 @@
 import json
 import sys
 from datetime import datetime, timezone
+
+from rich.console import Console
+from rich.table import Table
+from rich import box
 import config
+
+console = Console()
+
+# verdict colors for rich markup
+VERDICT_COLOR = {
+    "malicious": "bold red",
+    "suspicious": "bold yellow",
+    "clean": "bold green",
+}
 
 
 def determine_verdict(ioc_type, vt_data, abuse_data=None):
@@ -84,10 +97,8 @@ def build_ioc_record(ioc_value, ioc_type, vt_data, abuse_data=None, include_raw=
         else:
             record["abuseipdb"] = None
     else:
-        # domains and hashes: note that abuseipdb doesn't support them
         record["abuseipdb"] = "not_applicable"
 
-    # raw responses are large — only include them if explicitly requested
     if include_raw:
         record["_raw"] = {
             "virustotal": vt_data.get("vt_raw"),
@@ -123,21 +134,82 @@ def build_report(ioc_records, metadata=None):
         "iocs": ioc_records,
     }
 
-    # attach any extra metadata passed in (e.g. source file, pipeline info)
     if metadata:
         report["metadata"] = metadata
 
     return report
 
 
+def print_summary(report):
+    """print a rich terminal summary of the enrichment report."""
+
+    summary = report["summary"]
+    by_verdict = summary["by_verdict"]
+    total = summary["total_iocs"]
+
+    console.print()
+    console.print(f"[bold cyan]threat-intel-enricher[/bold cyan]  [dim]{report['generated_at']}[/dim]")
+    console.print(f"[dim]enriched {total} IOC(s)[/dim]")
+    console.print()
+
+    # verdict summary line
+    parts = []
+    for verdict, count in by_verdict.items():
+        if count:
+            color = VERDICT_COLOR.get(verdict, "white")
+            parts.append(f"[{color}]{count} {verdict}[/{color}]")
+    if parts:
+        console.print("  " + "  ·  ".join(parts))
+    console.print()
+
+    # one row per IOC
+    table = Table(box=box.SIMPLE, show_header=True, header_style="bold dim")
+    table.add_column("IOC", style="cyan", no_wrap=True)
+    table.add_column("type", style="dim")
+    table.add_column("verdict")
+    table.add_column("VT", justify="right")
+    table.add_column("abuse score", justify="right")
+    table.add_column("tags")
+
+    for rec in report["iocs"]:
+        verdict = rec.get("verdict", "clean")
+        color = VERDICT_COLOR.get(verdict, "white")
+        verdict_str = f"[{color}]{verdict}[/{color}]"
+
+        vt = rec.get("virustotal", {})
+        det = vt.get("detection_count")
+        total_eng = vt.get("total_engines")
+        vt_str = f"{det}/{total_eng}" if det is not None and total_eng else "n/a"
+
+        abuse = rec.get("abuseipdb")
+        if isinstance(abuse, dict):
+            score = abuse.get("confidence_score")
+            is_tor = abuse.get("is_tor")
+            abuse_str = f"{score}%" if score is not None else "n/a"
+            if is_tor:
+                abuse_str += " [dim](tor)[/dim]"
+        else:
+            abuse_str = "n/a"
+
+        tags = ", ".join(vt.get("tags", [])[:3]) or "—"
+
+        table.add_row(rec["ioc"], rec["type"], verdict_str, vt_str, abuse_str, tags)
+
+    console.print(table)
+
+
 def output_report(report, output_file=None, pretty=True):
-    """write the report to stdout or a file."""
+    """print rich summary to stderr, then write JSON to stdout or file."""
+
+    # always print the terminal summary
+    print_summary(report)
+
     indent = 2 if pretty else None
     serialized = json.dumps(report, indent=indent, default=str)
 
     if output_file:
         with open(output_file, "w") as f:
             f.write(serialized)
-        print(f"[reporter] wrote report to {output_file}", file=sys.stderr)
+        console.print(f"[dim]report saved to {output_file}[/dim]", stderr=True)
     else:
         print(serialized)
